@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <linearGradient id="sky" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#14192e"/><stop offset=".54" stop-color="#765876"/><stop offset="1" stop-color="#f1a57f"/></linearGradient>
+    <linearGradient id="water" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#9a687c"/><stop offset="1" stop-color="#202a46"/></linearGradient>
+    <linearGradient id="moon" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#fff0c5"/><stop offset="1" stop-color="#ed9e89"/></linearGradient>
+    <linearGradient id="mount" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#5c5875"/><stop offset="1" stop-color="#2d3556"/></linearGradient>
+    <linearGradient id="glow" x1="0" x2="1"><stop stop-color="#e69d88" stop-opacity="0"/><stop offset=".5" stop-color="#f8b996" stop-opacity=".65"/><stop offset="1" stop-color="#e69d88" stop-opacity="0"/></linearGradient>
+  </defs>
+  <path fill="url(#sky)" d="M0 0h1280v580H0z"/>
+  <circle cx="860" cy="263" r="129" fill="#edab9a" opacity=".09"/>
+  <circle cx="860" cy="263" r="101" fill="#edab9a" opacity=".13"/>
+  <circle cx="860" cy="263" r="77" fill="url(#moon)"/>
+  <g fill="#ffead4" opacity=".7">
+    <circle cx="81" cy="79" r="1.9"/><circle cx="169" cy="125" r="1.2"/><circle cx="216" cy="48" r="1.1"/><circle cx="332" cy="161" r="2"/><circle cx="372" cy="94" r="1.2"/><circle cx="485" cy="60" r="1.4"/><circle cx="518" cy="123" r="1.2"/><circle cx="620" cy="87" r="2"/><circle cx="750" cy="52" r="1.1"/><circle cx="945" cy="92" r="1.6"/><circle cx="1001" cy="158" r="1.3"/><circle cx="1110" cy="77" r="1.9"/><circle cx="1212" cy="135" r="1.3"/>
+  </g>
+  <path fill="#a17b90" d="M0 433 126 340l69 36 86-94 118 116 72-74 49 37 103-114 71 97 88 83 61-35 49 39 91-71 40 38 98-91 159 127v119H0Z"/>
+  <path fill="url(#mount)" d="M0 477 109 359l51 34 75-75 56 43 73 105 111-94 94 75 66-31 50 40 108-65 60 49 62-64 47 35 89-70 52 54 87 57v113H0Z"/>
+  <path fill="#343852" d="M0 469 118 417l73 22 74-20 144 63 105-27 130 37 104-25 91 19 127-42 75 20 98-37 141 44v109H0Z"/>
+  <path fill="url(#water)" d="M0 502h1280v218H0Z"/>
+  <g fill="url(#glow)">
+    <path d="M539 513h641l-98 3H628z"/><path d="M625 527h511l-103 3H699z"/><path d="M477 544h732l-121 4H566z"/><path d="M675 565h410l-79 3H745z"/><path d="M443 595h717l-134 4H537z"/><path d="M639 632h416l-61 3H716z"/><path d="M483 666h689l-126 3H565z"/>
+  </g>
+  <path fill="#1b2035" d="M0 547l71 36 79 12 53 32 60 6 94 57 49 30H0Z"/>
+  <path fill="#1a2138" d="M1280 526l-62 51-82 13-52 39-89 21-74 70h359Z"/>
+  <g fill="#171e32">
+    <path d="m49 468 33 76H16zM51 480l39 86H11zM53 514l42 76H9z"/><path d="m119 497 22 59H97zM120 521l29 64H91zM121 547l34 63H87z"/><path d="m1220 472 27 67h-54zM1220 503l36 70h-72zM1220 534l42 68h-84z"/><path d="m1260 423 28 85h-56zM1260 451l35 87h-70zM1260 493l49 88h-98z"/>
+  </g>
+  <g fill="#f5e6e5" font-family="DejaVu Sans, sans-serif">
+    <text x="86" y="112" font-size="18" letter-spacing="7" opacity=".85">QUIETCUT SAMPLE PROJECT</text>
+    <text x="82" y="205" font-size="73" font-weight="700" letter-spacing="-3">Blue Hour</text>
+    <text x="86" y="246" font-size="19" letter-spacing="2" opacity=".74">A short editing demo</text>
+  </g>
+</svg>

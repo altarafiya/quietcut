@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=QuietCut
+GenericName=Video Editor
+Comment=Trim video, remove silence, and even out audio
+Exec=quietcut %F
+Icon=quietcut
+Terminal=false
+Categories=AudioVideo;Video;AudioVideoEditing;
+MimeType=video/mp4;video/x-matroska;video/quicktime;video/webm;video/x-msvideo;video/mp2t;
+StartupNotify=true

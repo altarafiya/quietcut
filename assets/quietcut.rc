@@ -1,0 +1,26 @@
+1 ICON "assets/quietcut.ico"
+1 24 "assets/quietcut.manifest"
+1 VERSIONINFO
+FILEVERSION 1,8,0,0
+PRODUCTVERSION 1,8,0,0
+FILEFLAGSMASK 0x3fL
+FILEFLAGS 0
+FILEOS 0x00040004L
+FILETYPE 0x00000001L
+BEGIN
+ BLOCK "StringFileInfo"
+ BEGIN
+  BLOCK "040904B0"
+  BEGIN
+   VALUE "FileDescription", "QuietCut native video editor\0"
+   VALUE "ProductName", "QuietCut\0"
+   VALUE "FileVersion", "1.8.0\0"
+   VALUE "ProductVersion", "1.8.0\0"
+   VALUE "OriginalFilename", "QuietCut.exe\0"
+  END
+ END
+ BLOCK "VarFileInfo"
+ BEGIN
+  VALUE "Translation", 0x409, 1200
+ END
+END

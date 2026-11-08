@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-labelledby="title desc">
+  <title id="title">QuietCut</title>
+  <desc id="desc">QuietCut film icon beside a silver editing timeline with muted red silence cuts.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#141419"/><stop offset="1" stop-color="#302d38"/>
+    </linearGradient>
+    <linearGradient id="clip" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#555261"/><stop offset="1" stop-color="#2e2b38"/>
+    </linearGradient>
+    <pattern id="grid" width="47" height="45" patternUnits="userSpaceOnUse">
+      <path d="M47 0H0v45" fill="none" stroke="#c2bdca" stroke-opacity=".095"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="360" rx="25" fill="url(#bg)"/>
+  <rect x=".5" y=".5" width="1279" height="359" rx="25" fill="none" stroke="#514c58"/>
+  <path d="M601 1h650q28 0 28 27v304q0 27-28 27H601Z" fill="url(#grid)"/>
+  <g transform="translate(65 65)">
+    <rect width="76" height="76" rx="16" fill="#26242c" stroke="#625e6d"/>
+    <rect x="13" y="19" width="50" height="38" rx="6" fill="#e6e3ec"/>
+    <rect x="24" y="24" width="28" height="28" rx="3" fill="#26242c"/>
+    <path d="m34 29 13 9-13 9z" fill="#e6e3ec"/>
+    <path d="M17 25h4v4h-4zm0 11h4v4h-4zm0 11h4v4h-4zm38-22h4v4h-4zm0 11h4v4h-4zm0 11h4v4h-4z" fill="#26242c"/>
+  </g>
+  <g font-family="DejaVu Sans, Arial, sans-serif">
+    <text x="64" y="223" font-size="86" font-weight="700" letter-spacing="-5" fill="#f3f0f6">QuietCut</text>
+    <text x="69" y="271" font-size="24" fill="#c8c1d0">Video editing with automatic silence removal</text>
+  </g>
+  <g transform="translate(652 70)">
+    <rect width="565" height="220" rx="17" fill="#1c1a22" stroke="#595461"/>
+    <path d="M20 60h524M20 177h524" fill="none" stroke="#48444f"/>
+    <g stroke="#48444f"><path d="M27 49v128m85-128v128m86-128v128m85-128v128m86-128v128m86-128v128m85-128v128"/></g>
+    <g fill="#a9a3b1" font-size="12" font-family="monospace">
+      <text x="28" y="44">0:00</text><text x="113" y="44">0:05</text><text x="199" y="44">0:10</text><text x="284" y="44">0:15</text><text x="370" y="44">0:20</text><text x="456" y="44">0:25</text>
+    </g>
+    <rect x="25" y="83" width="145" height="76" rx="6" fill="url(#clip)" stroke="#716d7a"/>
+    <rect x="174" y="83" width="224" height="76" rx="6" fill="url(#clip)" stroke="#d8d4e0"/>
+    <rect x="402" y="83" width="137" height="76" rx="6" fill="url(#clip)" stroke="#716d7a"/>
+    <path d="M184 109v31m204-31v31" stroke="#eeeaf4" stroke-width="3" stroke-linecap="round"/>
+    <g stroke="#cac4d4" stroke-opacity=".8" stroke-width="2" stroke-linecap="round">
+      <path d="M40 119v5m6-12v19m6-25v31m6-20v12m6-8v4m12-9v15m6-27v39m6-31v23m6-13v4m28-9v15m6-27v39m6-32v25m6-19v13m6-10v7"/>
+      <path d="M197 118v7m6-13v19m6-27v39m6-33v27m6-21v15m6-10v5m13-13v20m6-29v38m6-24v10m6-7v4m30-10v16m6-30v44m6-35v26m6-23v20m6-13v6m13-12v18m6-27v36m6-23v10m30-13v16m6-24v32m6-22v12"/>
+      <path d="M421 117v9m6-19v29m6-22v15m6-12v9m6-8v6m25-12v19m6-27v39m6-30v21m6-17v13m6-9v5m13-14v22m6-27v32m6-20v8"/>
+    </g>
+    <g fill="#ad6773"><rect x="100" y="150" width="19" height="5" rx="2"/><rect x="263" y="150" width="20" height="5" rx="2"/><rect x="344" y="150" width="19" height="5" rx="2"/><rect x="450" y="150" width="16" height="5" rx="2"/></g>
+    <path d="M302 30v151" stroke="#f1edf5" stroke-width="2"/>
+    <rect x="296" y="27" width="12" height="7" rx="2" fill="#f1edf5"/>
+    <rect x="25" y="194" width="514" height="7" rx="3" fill="#302d38"/>
+    <rect x="92" y="194" width="231" height="7" rx="3" fill="#65616e"/>
+  </g>
+</svg>
