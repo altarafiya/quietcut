@@ -1,0 +1,10 @@
+<resources>
+    <style name="QuietCutTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowBackground">#111019</item>
+        <item name="android:colorAccent">#D4C5FF</item>
+        <item name="android:statusBarColor">#111019</item>
+        <item name="android:navigationBarColor">#111019</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

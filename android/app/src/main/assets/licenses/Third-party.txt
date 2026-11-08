@@ -1,0 +1,12 @@
+QuietCut for Android includes libraries licensed under the Apache License,
+Version 2.0. See Apache-2.0.txt for the license text.
+
+AndroidX, including Media3 1.6.1
+https://developer.android.com/jetpack/androidx
+
+Guava 33.3.1-android and FailureAccess 1.0.2
+https://github.com/google/guava
+
+Kotlin standard library 1.8.0 and JetBrains Java annotations 13.0
+https://github.com/JetBrains/kotlin
+https://github.com/JetBrains/java-annotations
