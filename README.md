@@ -6,11 +6,11 @@ Trim and reorder video clips, shorten pauses, and export files on your device.
 The Linux and Windows editors use Rust and FFmpeg. The Android app uses Android's
 built-in media codecs.
 
-| Platform | Get QuietCut |
+| Platform | Download |
 | --- | --- |
 | Linux · amd64 | [Debian package](https://github.com/altarafiya/quietcut/releases/download/v1.8.0-5/quietcut_1.8.0-5_amd64.deb) |
-| Windows 10/11 · x64 | [Windows editor notes](docs/windows-1.8.md) |
-| Android 10+ | [Android source](android/) |
+| Windows 10/11 · x64 | [Portable .exe](https://github.com/altarafiya/quietcut/releases/download/v1.8.0-5/QuietCut-Windows-x64.exe) |
+| Android 10+ | [Signed APK](https://github.com/altarafiya/quietcut/releases/download/android-v1.0.0/QuietCut-Android-1.0.0.apk) |
 
 ## Edit on the timeline
 
@@ -35,9 +35,9 @@ detected pauses that QuietCut will skip when silence removal is enabled.
   silence removal. **Lossless** preserves the retained frames pixel for pixel.
   The two H.264 presets trade size against detail and offer wider compatibility.
 
-QuietCut uses NVIDIA encoding when the encoder and driver support it, with
-software encoding available as a fallback. File-size savings vary by source
-and selected quality.
+On Linux, QuietCut tries NVIDIA NVENC when available and falls back to CPU
+encoding. Run `QUIETCUT_DISABLE_GPU=1 quietcut` to force the CPU. File-size
+savings vary by source and selected quality.
 
 The [audio-only export window](docs/media/audio.png) keeps the same audio cleanup
 controls and hides video quality settings.
