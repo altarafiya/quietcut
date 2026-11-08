@@ -16,8 +16,11 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+#[path = "audio_export.rs"]
+mod audio_export;
 #[path = "fast_export.rs"]
 mod fast_export;
+pub use audio_export::export_audio;
 
 pub type Result<T> = std::result::Result<T, String>;
 pub type Cancel = Arc<AtomicBool>;
@@ -78,8 +81,10 @@ pub struct Settings {
     pub threshold: f64,
     pub min_silence: f64,
     pub padding: f64,
-    /// 0 = copy; 1 = FFV1 lossless; 2 = H.264 CRF18; 3 = H.264 CRF23
+    /// 0 = copy; 1 = lossless; 2 = high quality H.264; 3 = compact H.264; 4 = HEVC
     pub quality: usize,
+    #[serde(default = "default_compression_quality")]
+    pub compression_quality: u8,
     pub level: bool,
     pub dark: bool,
     #[serde(default = "default_gpu")]
@@ -91,6 +96,9 @@ pub struct Settings {
     #[serde(default = "default_gpu")]
     pub adaptive: bool,
 }
+fn default_compression_quality() -> u8 {
+    24
+}
 fn default_gpu() -> bool {
     true
 }
@@ -101,6 +109,7 @@ impl Default for Settings {
             min_silence: 0.5,
             padding: 0.14,
             quality: 0,
+            compression_quality: default_compression_quality(),
             level: false,
             dark: true,
             gpu: true,
@@ -149,8 +158,11 @@ impl Settings {
         if !self.padding.is_finite() || !(0.0..=2.0).contains(&self.padding) {
             return Err("Keep edges must be between 0 and 2 seconds.".into());
         }
-        if self.quality > 3 {
+        if self.quality > 4 {
             return Err("Unknown quality setting.".into());
+        }
+        if self.quality == 4 && !(18..=32).contains(&self.compression_quality) {
+            return Err("HEVC quality must be between 18 and 32.".into());
         }
         Ok(())
     }
@@ -377,9 +389,7 @@ fn run_guarded(
     Ok(())
 }
 
-pub fn probe(tools: &Tools, path: &Path, cancel: &Cancel) -> Result<Media> {
-    let absolute = std::path::absolute(path).map_err(|e| e.to_string())?;
-    let path = absolute.as_path();
+fn probe_file(tools: &Tools, path: &Path, cancel: &Cancel) -> Result<Value> {
     let mut argv = args(&[
         "-v",
         "error",
@@ -396,8 +406,13 @@ pub fn probe(tools: &Tools, path: &Path, cancel: &Cancel) -> Result<Media> {
             json.push('\n');
         }
     })?;
-    let v: Value =
-        serde_json::from_str(&json).map_err(|e| format!("Cannot read video information: {e}"))?;
+    serde_json::from_str(&json).map_err(|e| format!("Cannot read media information: {e}"))
+}
+
+pub fn probe(tools: &Tools, path: &Path, cancel: &Cancel) -> Result<Media> {
+    let absolute = std::path::absolute(path).map_err(|e| e.to_string())?;
+    let path = absolute.as_path();
+    let v = probe_file(tools, path, cancel)?;
     let streams = v["streams"]
         .as_array()
         .ok_or("This file contains no media streams.")?;
@@ -753,7 +768,58 @@ fn copy_signature(tools: &Tools, media: &Media, cancel: &Cancel) -> Result<Value
     Ok(Value::Array(streams))
 }
 
-fn nvenc_available(tools: &Tools, lossless: bool, cancel: &Cancel) -> Result<bool> {
+fn video_encoding(argv: &mut Vec<OsString>, settings: &Settings, gpu: bool) {
+    let hevc = settings.quality == 4;
+    let quality = match settings.quality {
+        2 => 18,
+        4 => settings.compression_quality,
+        _ => 23,
+    };
+    if gpu {
+        argv.extend(args(&[
+            "-c:v",
+            if hevc { "hevc_nvenc" } else { "h264_nvenc" },
+            "-preset",
+            if hevc { "p5" } else { "p4" },
+        ]));
+        if settings.quality == 1 {
+            argv.extend(args(&["-tune", "lossless", "-rc", "constqp", "-qp", "0"]));
+        } else {
+            argv.extend(args(&[
+                "-tune",
+                "hq",
+                "-rc",
+                "vbr",
+                "-b:v",
+                "0",
+                "-spatial-aq",
+                "1",
+            ]));
+            arg(argv, "-cq", quality.to_string());
+        }
+    } else if settings.quality == 1 {
+        argv.extend(args(&["-c:v", "ffv1", "-level", "3", "-slicecrc", "1"]));
+    } else {
+        argv.extend(args(&[
+            "-c:v",
+            if hevc { "libx265" } else { "libx264" },
+            "-preset",
+            if hevc { "fast" } else { "veryfast" },
+        ]));
+        arg(argv, "-crf", quality.to_string());
+        if hevc {
+            argv.extend(args(&["-x265-params", "log-level=error"]));
+        }
+    }
+}
+
+fn mp4_video_tag(argv: &mut Vec<OsString>, settings: &Settings) {
+    if settings.quality == 4 {
+        argv.extend(args(&["-tag:v", "hvc1"]));
+    }
+}
+
+fn nvenc_available(tools: &Tools, settings: &Settings, cancel: &Cancel) -> Result<bool> {
     let mut a = args(&[
         "-v",
         "error",
@@ -764,18 +830,27 @@ fn nvenc_available(tools: &Tools, lossless: bool, cancel: &Cancel) -> Result<boo
         "color=size=128x128:duration=0.04",
         "-frames:v",
         "1",
-        "-c:v",
-        "h264_nvenc",
-        "-preset",
-        "p4",
     ]);
-    if lossless {
-        a.extend(args(&["-tune", "lossless", "-rc", "constqp", "-qp", "0"]));
-    }
+    video_encoding(&mut a, settings, true);
     a.extend(args(&["-f", "null", "-"]));
     let ok = run(&tools.ffmpeg, &a, cancel, |_, _| {}).is_ok();
     cancelled(cancel)?;
     Ok(ok)
+}
+
+fn export_destination(output: &Path, extension: &str) -> Result<PathBuf> {
+    let output = std::path::absolute(output).map_err(|e| e.to_string())?;
+    if output.exists() {
+        return Err("That output already exists. Choose a new name.".into());
+    }
+    if output
+        .extension()
+        .and_then(|s| s.to_str())
+        .is_none_or(|s| !s.eq_ignore_ascii_case(extension))
+    {
+        return Err(format!("Choose a .{extension} filename."));
+    }
+    Ok(output)
 }
 
 /// Render a single video track with linked audio, using one pass when compatible.
@@ -792,17 +867,7 @@ pub fn export_timeline(
     if timeline.clips.is_empty() {
         return Err("Import a video first.".into());
     }
-    let output = std::path::absolute(output).map_err(|e| e.to_string())?;
-    if output.exists() {
-        return Err("That output already exists. Choose a new name.".into());
-    }
-    if output
-        .extension()
-        .and_then(|s| s.to_str())
-        .is_none_or(|s| !s.eq_ignore_ascii_case(settings.extension()))
-    {
-        return Err(format!("Choose a .{} filename.", settings.extension()));
-    }
+    let output = export_destination(output, settings.extension())?;
     let temp = TempDir::new(output.parent().ok_or("Choose an output folder.")?)?;
     let first = &timeline.clips[0].media;
     if settings.quality == 0 {
@@ -943,7 +1008,7 @@ pub fn export_timeline(
         && !high_depth;
     let gpu = allow_gpu
         && (settings.quality != 1 || first.pixel_format == "yuv420p")
-        && nvenc_available(tools, settings.quality == 1, cancel)?;
+        && nvenc_available(tools, settings, cancel)?;
     let mut cuda_filters = String::new();
     if gpu {
         let _ = run(
@@ -1076,36 +1141,7 @@ pub fn export_timeline(
                 )
             };
             arg(&mut a, "-vf", filter);
-            if gpu {
-                a.extend(args(&["-c:v", "h264_nvenc", "-preset", "p4"]));
-                if settings.quality == 1 {
-                    a.extend(args(&["-tune", "lossless", "-rc", "constqp", "-qp", "0"]));
-                } else {
-                    a.extend(args(&[
-                        "-tune",
-                        "hq",
-                        "-rc",
-                        "vbr",
-                        "-cq",
-                        if settings.quality == 2 { "18" } else { "23" },
-                        "-b:v",
-                        "0",
-                        "-spatial-aq",
-                        "1",
-                    ]));
-                }
-            } else if settings.quality == 1 {
-                a.extend(args(&["-c:v", "ffv1", "-level", "3", "-slicecrc", "1"]));
-            } else {
-                a.extend(args(&[
-                    "-c:v",
-                    "libx264",
-                    "-preset",
-                    "veryfast",
-                    "-crf",
-                    if settings.quality == 2 { "18" } else { "23" },
-                ]));
-            }
+            video_encoding(&mut a, settings, gpu);
             for (flag, value) in &m.color {
                 arg(&mut a, flag, value);
             }
@@ -1164,6 +1200,7 @@ pub fn export_timeline(
     a.push(list_path.into_os_string());
     stream_maps(&mut a);
     a.extend(args(&["-c:v", "copy"]));
+    mp4_video_tag(&mut a, settings);
     if settings.quality < 2 {
         a.extend(args(&["-c:a", "copy"]));
     } else if settings.quality >= 2 {
@@ -1425,20 +1462,8 @@ pub fn export(
             arg(&mut argv, "-i", media.path.as_os_str());
             arg(&mut argv, "-t", format!("{:.9}", span.len()));
             stream_maps(&mut argv);
-            if settings.quality == 1 {
-                argv.extend(args(&["-c:v", "ffv1", "-level", "3", "-slicecrc", "1"]));
-            } else {
-                argv.extend(args(&[
-                    "-c:v",
-                    "libx264",
-                    "-preset",
-                    "veryfast",
-                    "-crf",
-                    if settings.quality == 2 { "18" } else { "23" },
-                ]));
-                // Keep the source bit depth and chroma format where x264 supports it.
-                // No forced yuv420p conversion, scaling, or frame-rate conversion.
-            }
+            // Let the software encoder retain source bit depth where supported.
+            video_encoding(&mut argv, settings, false);
             for (flag, value) in &media.color {
                 arg(&mut argv, flag, value);
             }
@@ -1470,6 +1495,7 @@ pub fn export(
     argv.push(list.into_os_string());
     stream_maps(&mut argv);
     argv.extend(args(&["-c:v", "copy"]));
+    mp4_video_tag(&mut argv, settings);
     if settings.level && settings.quality == 0 {
         arg(&mut argv, "-af", LEVEL_FILTER);
     }
@@ -1761,4 +1787,54 @@ mod tests {
         assert!(!cancel.load(Ordering::Relaxed));
         assert!(started.elapsed() < Duration::from_secs(3));
     }
+}
+
+// One ordered sink per track keeps FFmpeg from buffering future segments while
+// it writes an earlier one. Empty spans add neither samples nor a timestamp gap.
+fn append_audio_cuts(graph: &mut String, input: &str, track: usize, ranges: &[(u64, u64)]) {
+    if let [(start, end)] = ranges {
+        graph.push_str(&format!(
+            "{input},atrim=start_sample={start}:end_sample={end},asetpts=N/SR/TB[a{track}]"
+        ));
+        return;
+    }
+    let mut boundaries: Vec<_> = ranges
+        .iter()
+        .flat_map(|(start, end)| [*start, *end])
+        .filter(|sample| *sample > 0)
+        .collect();
+    boundaries.sort_unstable();
+    boundaries.dedup();
+    graph.push_str(&format!(
+        "{input},asegment=samples='{}'",
+        boundaries
+            .iter()
+            .map(u64::to_string)
+            .collect::<Vec<_>>()
+            .join("|"),
+    ));
+    for i in 0..=boundaries.len() {
+        graph.push_str(&format!("[s{track}_{i}]"));
+    }
+    for (i, start) in std::iter::once(0)
+        .chain(boundaries.iter().copied())
+        .enumerate()
+    {
+        let discard = if ranges.binary_search_by_key(&start, |(a, _)| *a).is_ok() {
+            ""
+        } else {
+            "aselect=0,"
+        };
+        graph.push_str(&format!(
+            ";[s{track}_{i}]{discard}asetpts=N/SR/TB[k{track}_{i}]"
+        ));
+    }
+    graph.push(';');
+    let segments = boundaries.len() + 1;
+    for i in 0..segments {
+        graph.push_str(&format!("[k{track}_{i}]"));
+    }
+    graph.push_str(&format!(
+        "concat=n={segments}:v=0:a=1,asetpts=N/SR/TB[a{track}]"
+    ));
 }

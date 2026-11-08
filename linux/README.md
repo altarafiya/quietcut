@@ -15,9 +15,20 @@ The native Rust CLI is available as `quietcut-cli`. FFmpeg and FFprobe are
 system dependencies. NVIDIA acceleration is used when FFmpeg and the installed
 driver support it. The editor works with CPU encoding as well.
 
+## Compression and audio
+
+Choose **Smaller file · HEVC** for adjustable H.265 compression. Start at
+**24** and move toward **More detail** or **Smaller file** as needed. **Preview
+sample** encodes up to eight seconds to check your settings. The control uses
+CRF for software x265 and CQ for NVIDIA encoding, so results can differ.
+
+Choose **Audio only · M4A** to export the edited audio without encoding video.
+It preserves linked tracks as stereo AAC at 192 kb/s per track and applies
+silence removal and **Even audio** when enabled.
+
 ## Build the installer
 
 Install Rust and Cargo, a C compiler, binutils and the Debian packaging tools.
 From the repository root, run `sh linux/build-deb.sh ./dist`. Install the
-result with `sudo apt install ./dist/quietcut_1.8.0-4_amd64.deb` on x86-64.
+result with `sudo apt install ./dist/quietcut_1.8.0-5_amd64.deb` on x86-64.
 The package declares its FFmpeg, Qt and Python dependencies for APT.

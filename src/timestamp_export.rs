@@ -193,52 +193,19 @@ pub(super) fn build(
         selection(&ranges),
         offset_expression(&offsets),
     );
-    // Keep a single audio sink. Independent anullsinks eagerly drain future
-    // segments, which can hold the output at startup on long edited recordings.
-    // Empty segments stay in the ordered concat; reset their EOF timestamp to
-    // zero so a discarded interval adds neither samples nor an output gap.
-    let mut boundaries: Vec<_> = audio
-        .iter()
-        .flat_map(|(a, b)| [*a, *b])
-        .filter(|n| *n > 0)
-        .collect();
-    boundaries.sort_unstable();
-    boundaries.dedup();
     for track in 0..m.audio_count {
         let level_filter = if level {
             format!(",{LEVEL_FILTER}")
         } else {
             String::new()
         };
-        graph.push_str(&format!(
-            ";[0:a:{track}]asetpts=PTS-{:.9}/TB,aresample=48000:async=1:first_pts=0,apad,atrim=end_sample={},asetpts=PTS-STARTPTS{level_filter},asegment=samples='{}'",
-            m.start_time, audio.last().unwrap().1,
-            boundaries.iter().map(u64::to_string).collect::<Vec<_>>().join("|"),
-        ));
-        for i in 0..=boundaries.len() {
-            graph.push_str(&format!("[s{track}_{i}]"));
-        }
-        for (i, start) in std::iter::once(0)
-            .chain(boundaries.iter().copied())
-            .enumerate()
-        {
-            let discard = if audio.binary_search_by_key(&start, |(a, _)| *a).is_ok() {
-                ""
-            } else {
-                "aselect=0,"
-            };
-            graph.push_str(&format!(
-                ";[s{track}_{i}]{discard}asetpts=N/SR/TB[k{track}_{i}]"
-            ));
-        }
+        let input = format!(
+            "[0:a:{track}]asetpts=PTS-{:.9}/TB,aresample=48000:async=1:first_pts=0,apad,atrim=end_sample={},asetpts=PTS-STARTPTS{level_filter}",
+            m.start_time,
+            audio.last().unwrap().1,
+        );
         graph.push(';');
-        let segments = boundaries.len() + 1;
-        for i in 0..segments {
-            graph.push_str(&format!("[k{track}_{i}]"));
-        }
-        graph.push_str(&format!(
-            "concat=n={segments}:v=0:a=1,asetpts=N/SR/TB[a{track}]"
-        ));
+        append_audio_cuts(&mut graph, &input, track, &audio);
     }
     Ok(Some(RenderPlan {
         graph,

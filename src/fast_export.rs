@@ -308,36 +308,8 @@ fn render(
         "-sn",
         "-dn",
     ]));
-    if gpu {
-        argv.extend(args(&["-c:v", "h264_nvenc", "-preset", "p4"]));
-        if settings.quality == 1 {
-            argv.extend(args(&["-tune", "lossless", "-rc", "constqp", "-qp", "0"]));
-        } else {
-            argv.extend(args(&[
-                "-tune",
-                "hq",
-                "-rc",
-                "vbr",
-                "-cq",
-                if settings.quality == 2 { "18" } else { "23" },
-                "-b:v",
-                "0",
-                "-spatial-aq",
-                "1",
-            ]));
-        }
-    } else if settings.quality == 1 {
-        argv.extend(args(&["-c:v", "ffv1", "-level", "3", "-slicecrc", "1"]));
-    } else {
-        argv.extend(args(&[
-            "-c:v",
-            "libx264",
-            "-preset",
-            "veryfast",
-            "-crf",
-            if settings.quality == 2 { "18" } else { "23" },
-        ]));
-    }
+    video_encoding(&mut argv, settings, gpu);
+    mp4_video_tag(&mut argv, settings);
     for (flag, value) in &m.color {
         arg(&mut argv, flag, value);
     }

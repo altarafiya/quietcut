@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="376" viewBox="0 0 1280 376" role="img" aria-labelledby="title desc">
+  <title id="title">QuietCut video and audio exports</title>
+  <desc id="desc">An illustrated film strip branches into a compressed HEVC video and an M4A audio waveform.</desc>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#171624"/><stop offset="1" stop-color="#292239"/>
+    </linearGradient>
+    <linearGradient id="sky" x2="0" y2="1">
+      <stop stop-color="#503c68"/><stop offset="1" stop-color="#d89588"/>
+    </linearGradient>
+    <linearGradient id="flow" x2="1" y2="0">
+      <stop stop-color="#b69cd3"/><stop offset="1" stop-color="#ffc3a7"/>
+    </linearGradient>
+    <pattern id="dots" width="16" height="16" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1" fill="#f0dcff" opacity=".12"/>
+    </pattern>
+    <clipPath id="film"><rect x="51" y="112" width="292" height="152" rx="12"/></clipPath>
+    <clipPath id="card"><rect x="567" y="71" width="293" height="190" rx="16"/></clipPath>
+  </defs>
+  <rect x="1" y="1" width="1278" height="374" rx="23" fill="url(#bg)" stroke="#4c4159" stroke-width="2"/>
+  <path d="M367 18h877v340H367z" fill="url(#dots)"/>
+  <g font-family="DejaVu Sans, Arial, sans-serif">
+    <text x="51" y="67" fill="#f3eaff" font-size="34" font-weight="700">Export video or audio</text>
+    <text x="52" y="307" fill="#cabbd5" font-size="19">EDITED TIMELINE</text>
+    <g clip-path="url(#film)">
+      <rect x="51" y="112" width="292" height="152" fill="url(#sky)"/>
+      <circle cx="253" cy="166" r="30" fill="#ffe1b8"/>
+      <path d="m51 233 72-65 38 33 49-48 79 77 54-34v68H51Z" fill="#665179"/>
+      <path d="m51 239 51-25 39 18 48-21 39 18 54-18 61 24v30H51Z" fill="#33304e"/>
+      <path d="M51 113h292v20H51zm0 130h292v21H51z" fill="#252237"/>
+      <g fill="#d0bdd9">
+        <rect x="65" y="119" width="12" height="7" rx="2"/><rect x="101" y="119" width="12" height="7" rx="2"/><rect x="137" y="119" width="12" height="7" rx="2"/><rect x="173" y="119" width="12" height="7" rx="2"/><rect x="209" y="119" width="12" height="7" rx="2"/><rect x="245" y="119" width="12" height="7" rx="2"/><rect x="281" y="119" width="12" height="7" rx="2"/><rect x="317" y="119" width="12" height="7" rx="2"/>
+        <rect x="65" y="250" width="12" height="7" rx="2"/><rect x="101" y="250" width="12" height="7" rx="2"/><rect x="137" y="250" width="12" height="7" rx="2"/><rect x="173" y="250" width="12" height="7" rx="2"/><rect x="209" y="250" width="12" height="7" rx="2"/><rect x="245" y="250" width="12" height="7" rx="2"/><rect x="281" y="250" width="12" height="7" rx="2"/><rect x="317" y="250" width="12" height="7" rx="2"/>
+      </g>
+    </g>
+    <rect x="51.5" y="112.5" width="291" height="151" rx="11" fill="none" stroke="#8d779e"/>
+    <path d="M365 188h53c36 0 39-45 74-45h48m-122 45c36 0 39 100 74 100h395" fill="none" stroke="url(#flow)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="418" cy="188" r="6" fill="#dfb4d0"/>
+    <path d="m533 136 7 7-7 7m347 131 7 7-7 7" fill="none" stroke="#ffc3a7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="567" y="71" width="293" height="190" rx="16" fill="#332941" stroke="#9c80ad"/>
+    <g clip-path="url(#card)">
+      <path d="M567 71h293v106H567z" fill="url(#sky)"/>
+      <circle cx="744" cy="113" r="25" fill="#ffe1b8"/>
+      <path d="m567 175 61-52 33 26 38-44 75 63 38-31 48 32v10H567z" fill="#514465"/>
+    </g>
+    <text x="587" y="215" fill="#f6ebff" font-size="22" font-weight="700">Smaller video</text>
+    <text x="587" y="240" fill="#cdbad7" font-size="16">HEVC  ·  ADJUSTABLE QUALITY</text>
+    <rect x="909" y="116" width="320" height="188" rx="16" fill="#332941" stroke="#9c80ad"/>
+    <path d="M930 180h277" fill="none" stroke="#665174"/>
+    <path d="M941 175v10m9-15v20m9-27v34m9-43v52m9-37v22m9-30v38m9-28v18m9-17v16m9-33v50m9-58v66m9-44v22m9-18v14m9-23v32m9-46v60m9-43v26m9-17v8m9-14v20m9-26v32m9-52v72m9-47v22m9-16v10m9-20v30m9-47v64m9-43v22m9-29v36m9-26v16m9-13v10m9-23v36m9-31v26m9-18v10" fill="none" stroke="#ffc3a7" stroke-width="3" stroke-linecap="round"/>
+    <text x="930" y="258" fill="#f6ebff" font-size="22" font-weight="700">Audio only</text>
+    <text x="930" y="282" fill="#cdbad7" font-size="16">M4A  ·  EDITS AND CLEANUP INCLUDED</text>
+  </g>
+</svg>

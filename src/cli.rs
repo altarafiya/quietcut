@@ -53,7 +53,7 @@ fn execute() -> Result<()> {
         return timeline_cli(&a);
     }
     if a.len() < 3 {
-        return Err("Usage: quietcut-cli INPUT OUTPUT [copy|lossless|high|compact] [level] [threshold] [min_silence] [padding]".into());
+        return Err("Usage: quietcut-cli INPUT OUTPUT [copy|lossless|high|compact|hevc] [level] [threshold] [min_silence] [padding]".into());
     }
     let tools = Tools::find()?;
     let c = Arc::new(AtomicBool::new(false));
@@ -63,6 +63,7 @@ fn execute() -> Result<()> {
         "lossless" => 1,
         "high" => 2,
         "compact" => 3,
+        "hevc" => 4,
         _ => return Err("Unknown quality mode".into()),
     };
     s.level = a.get(4).is_some_and(|v| v == "level");
@@ -95,7 +96,7 @@ fn execute() -> Result<()> {
 }
 fn timeline_cli(a: &[String]) -> Result<()> {
     if a.len() < 4 {
-        return Err("Usage: quietcut-cli --timeline PROJECT.json OUTPUT [copy|lossless|high|compact] [level] [silence]".into());
+        return Err("Usage: quietcut-cli --timeline PROJECT.json OUTPUT [copy|lossless|high|compact|hevc] [level] [silence]".into());
     }
     let tools = Tools::find()?;
     let cancel = Arc::new(AtomicBool::new(false));
@@ -105,6 +106,7 @@ fn timeline_cli(a: &[String]) -> Result<()> {
         "lossless" => 1,
         "high" => 2,
         "compact" => 3,
+        "hevc" => 4,
         _ => return Err("Unknown mode".into()),
     };
     s.level = a.get(5).is_some_and(|v| v == "level");
@@ -179,7 +181,7 @@ fn probe_cli(paths: &[String]) -> Result<()> {
         .iter()
         .map(
             |path| match probe(&tools, std::path::Path::new(path), &cancel) {
-                Ok(media) => json!({"path": path, "duration": media.duration, "fps": media.fps, "size": media.size}),
+                Ok(media) => json!({"path": path, "duration": media.duration, "fps": media.fps, "size": media.size, "audio_tracks": media.audio_count}),
                 Err(error) => json!({"path": path, "error": error}),
             },
         )
@@ -204,6 +206,10 @@ fn project_cli(args: &[String]) -> Result<()> {
     let mut settings: Settings =
         serde_json::from_value(project["settings"].clone()).map_err(|e| e.to_string())?;
     let silence = project["remove_silence"].as_bool().unwrap_or(false);
+    let audio_only = project["audio_only"].as_bool().unwrap_or(false);
+    if audio_only {
+        settings.quality = 2; // Audio cuts are independent of video keyframes.
+    }
     settings.exact_silence(silence);
     let tools = Tools::find()?;
     let cancel = Arc::new(AtomicBool::new(false));
@@ -228,15 +234,16 @@ fn project_cli(args: &[String]) -> Result<()> {
         }
     };
     if render {
-        let out = export_timeline(
-            &tools,
-            &timeline,
-            &settings,
-            silence,
-            Path::new(&args[3]),
-            &cancel,
-            progress,
-        )?;
+        let output = Path::new(&args[3]);
+        let out = if audio_only {
+            export_audio(
+                &tools, &timeline, &settings, silence, output, &cancel, progress,
+            )?
+        } else {
+            export_timeline(
+                &tools, &timeline, &settings, silence, output, &cancel, progress,
+            )?
+        };
         println!(
             "{}",
             json!({"output": out.path, "duration": out.duration, "size": out.size})

@@ -22,7 +22,7 @@ from interface import DARK, LIGHT, ExportDialog, Preview, apply_theme, button, g
 from timeline import Timeline
 
 VERSION = "1.8.0"
-REVISION = "4"
+REVISION = "5"
 CLI = os.environ.get("QUIETCUT_CLI") or shutil.which("quietcut-cli") or "/usr/bin/quietcut-cli"
 VIDEO_FILTER = "Videos (*.mp4 *.mkv *.mov *.webm *.avi *.m4v *.ts *.mts *.m2ts *.wmv);;All files (*)"
 READY = (QMediaPlayer.MediaStatus.LoadedMedia, QMediaPlayer.MediaStatus.BufferedMedia,
@@ -37,6 +37,7 @@ class Clip:
     size: int
     start: float = 0.
     end: float = 0.
+    audio_tracks: int = 0
 
     @property
     def length(self):
@@ -251,6 +252,7 @@ class Editor(QMainWindow):
 
         self.panel = ExportDialog(self)
         self.panel.setWindowIcon(self.windowIcon())
+        self.analysis_key = self.silence_settings()
         self.panel.changed.connect(self.options_changed)
         self.plan_timer = QTimer(self, singleShot=True, interval=220)
         self.plan_timer.timeout.connect(self.prepare_plan)
@@ -564,7 +566,8 @@ class Editor(QMainWindow):
             if "error" in item:
                 errors.append(f"{Path(item['path']).name}\n{item['error']}")
             else:
-                imported.append(Clip(item["path"], item["duration"], item["fps"], item["size"], end=item["duration"]))
+                imported.append(Clip(item["path"], item["duration"], item["fps"], item["size"],
+                                     end=item["duration"], audio_tracks=item.get("audio_tracks", 0)))
         if imported:
             self.snapshot()
             had_clips = bool(self.clips)
@@ -586,15 +589,37 @@ class Editor(QMainWindow):
         self.import_paths([url.toLocalFile() for url in event.mimeData().urls() if url.isLocalFile()])
         event.acceptProposedAction()
 
+    def silence_settings(self):
+        if not self.panel.silence.isChecked():
+            return None
+        settings = self.panel.options()
+        return tuple(settings[key] for key in ("threshold", "min_silence", "padding", "adaptive"))
+
     def options_changed(self):
+        analysis = self.silence_settings()
+        plan_changed = analysis != self.analysis_key
+        was_preview = self.in_preview
+        self.analysis_key = analysis
         self.pause()
         self.last_export = None
         self.panel.progress.hide()
         self.panel.status.clear()
         self.refresh_controls()
-        self.invalidate_plan()
-        if self.clips:
+        if plan_changed:
+            self.invalidate_plan()
+        else:
+            self.invalidate_preview()
+            self.update_metrics()
+        if self.clips and (plan_changed or was_preview):
             self.seek(self.playhead)
+
+    def invalidate_preview(self):
+        if self.preview_path:
+            if self.player.source().toLocalFile() == str(self.preview_path):
+                self.player.setSource(QUrl())
+            self.preview_path.unlink(missing_ok=True)
+            self.preview_path = None
+        self.in_preview = False
 
     def invalidate_plan(self):
         self.plan_generation += 1
@@ -602,12 +627,7 @@ class Editor(QMainWindow):
         self.plan_timer.stop()
         if self.plan_job:
             self.plan_job.cancel()
-        if self.preview_path:
-            if self.player.source().toLocalFile() == str(self.preview_path):
-                self.player.setSource(QUrl())
-            self.preview_path.unlink(missing_ok=True)
-            self.preview_path = None
-        self.in_preview = False
+        self.invalidate_preview()
         self.timeline.cuts = []
         if self.clips and self.panel.silence.isChecked():
             self.plan = None
@@ -622,11 +642,13 @@ class Editor(QMainWindow):
         self.update_metrics()
         self.timeline.update()
 
-    def project_file(self, name):
+    def project_file(self, name, sample=None):
         project = Path(self.scratch.name) / name
         project.write_text(json.dumps({
-            "clips": [clip.for_render() for clip in self.clips],
-            "remove_silence": self.panel.silence.isChecked(), "settings": self.panel.options(),
+            "clips": [clip.for_render() for clip in self.clips] if sample is None else sample,
+            "remove_silence": self.panel.silence.isChecked() and sample is None,
+            "audio_only": self.panel.audio_only(),
+            "settings": self.panel.options(),
         }), encoding="utf-8")
         return project
 
@@ -712,24 +734,54 @@ class Editor(QMainWindow):
     def preview_edit(self):
         if self.job or not self.clips:
             return
+        sample = None
+        if self.panel.sample_preview():
+            if self.plan is None:
+                self.panel.status.setText(self.plan_status or "Finding silence. Preview will be available shortly.")
+                return
+            sample = self.preview_sample()
+            if not sample:
+                self.panel.status.setText("No audio to preview." if self.panel.audio_only() else "No video to preview.")
+                return
         self.panel.hide()
-        if not self.panel.level.isChecked():
+        if sample is None and not self.panel.level.isChecked():
             if not self.playing:
                 self.toggle_play()
         elif self.preview_path:
             self.play_rendered_preview()
         else:
-            self.render(Path(self.scratch.name) / f"preview.{self.panel.extension()}", preview=True)
+            self.render(Path(self.scratch.name) / f"preview.{self.panel.extension()}", preview=True, sample=sample)
+
+    def preview_sample(self):
+        remaining = 8.
+        sample = []
+        for span in self.spans:
+            clip = self.clips[span.clip]
+            if not sample and self.panel.audio_only() and not clip.audio_tracks:
+                continue
+            end = min(span.end, span.start + remaining)
+            if end - span.start < .001:
+                break
+            sample.append(dict(path=clip.path, start=span.start, end=end))
+            remaining -= end - span.start
+        return sample
 
     def play_rendered_preview(self):
         self.pause()
         self.in_preview = True
         self.set_playing(True)
         self.request_media(self.preview_path, 0., True)
-        self.status.setText("Edited preview · click the ruler to return to the timeline")
+        if self.panel.audio_only():
+            self.preview.message = "Audio preview"
+            self.preview.update()
+        preview = "Encoded sample" if self.panel.sample_preview() else "Edited preview"
+        self.status.setText(f"{preview} · click the ruler to return to the timeline")
 
     def export(self):
         if self.job or not self.clips:
+            return
+        if self.panel.audio_only() and not any(clip.audio_tracks for clip in self.clips):
+            self.panel.status.setText("The timeline has no audio tracks to export.")
             return
         ext = self.panel.extension()
         name = self.panel.name.text().strip()
@@ -747,8 +799,9 @@ class Editor(QMainWindow):
             target = directory / f"{name} {number}.{ext}"
             number += 1
         if self.panel.destination == 2:
+            media = "audio" if self.panel.audio_only() else "video"
             path, _ = QFileDialog.getSaveFileName(
-                self.panel, "Save video", str(target), f"{ext.upper()} video (*.{ext})",
+                self.panel, f"Save {media}", str(target), f"{ext.upper()} {media} (*.{ext})",
                 options=QFileDialog.Option.DontConfirmOverwrite,
             )
             if not path:
@@ -763,14 +816,14 @@ class Editor(QMainWindow):
             return
         self.render(target, preview=False)
 
-    def render(self, target, preview):
+    def render(self, target, preview, sample=None):
         self.pause()
         if self.plan_job:
             self.plan_generation += 1
             self.plan_job.cancel()
             if self.plan is None:
                 self.plan_timer.start()
-        path = self.project_file("render.json")
+        path = self.project_file("render.json", sample)
         self.render_started = monotonic()
         self.progress.setRange(0, 0)
         self.progress.show()

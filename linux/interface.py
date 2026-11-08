@@ -7,7 +7,7 @@ from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PyQt6.QtMultimedia import QVideoFrame, QVideoSink
 from PyQt6.QtWidgets import (
     QButtonGroup, QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
-    QLabel, QLineEdit, QProgressBar, QPushButton, QSizePolicy, QSlider, QToolTip, QVBoxLayout, QWidget,
+    QLabel, QLineEdit, QProgressBar, QPushButton, QScrollArea, QSizePolicy, QSlider, QToolTip, QVBoxLayout, QWidget,
 )
 
 
@@ -111,6 +111,7 @@ def apply_theme(root, tone):
         QLabel[role="hint"] {{ color: {tone.muted}; font-size: 12px; }}
         QLabel[role="suffix"] {{ color: {tone.muted}; background: {tone.field}; border: 1px solid {tone.line}; border-radius: 6px; padding: 0px 10px; }}
         QLabel[role="muted"] {{ color: {tone.muted}; }}
+        QScrollArea#exportSettings {{ background: transparent; border: none; }}
         QFrame#rule {{ background: {tone.line}; }}
         QFrame#card {{ background: {tone.panel}; border: 1px solid {tone.line}; border-radius: 9px; }}
         QPushButton, QComboBox, QLineEdit {{
@@ -304,18 +305,23 @@ class Combo(QComboBox):
 
 class ExportDialog(QDialog):
     changed = pyqtSignal()
-    quality_names = ("Fast copy · Fastest", "Lossless · Best quality", "High quality", "Compact · Smaller file")
+    HEVC = 4
+    RECOMMENDED = 24
+    quality_names = ("Fast copy · Fastest", "Lossless · Best quality", "High quality · H.264",
+                     "Compact · H.264", "Smaller file · HEVC")
     quality_hints = (
         "Copies the video. Cuts snap to keyframes.",
         "Preserves every retained pixel. Produces large files.",
         "Frame-accurate H.264 with more detail than Compact.",
         "Frame-accurate H.264 with more compression than High quality.",
+        "H.265 compression for smaller files. Requires an HEVC-compatible player.",
     )
     quality_tips = (
         "Fastest export. Copies video without re-encoding.\nCuts snap to keyframes and joined clips must have matching formats.\nTurns off Remove silence. Even audio still re-encodes audio.",
         "Best image quality. Retained frames keep their original pixels.\nFrame-accurate cuts, with larger files and more processing.",
         "Best quality among the H.264 presets.\nFrame-accurate cuts with smaller files than Lossless.",
         "Smaller H.264 files than High quality. Frame-accurate cuts with more compression.",
+        "Use H.265 for better compression. Preview a short sample at the selected quality. NVIDIA acceleration is used when available.",
     )
     destination_tips = (
         "Save the export in the same folder as the first clip.",
@@ -340,16 +346,26 @@ class ExportDialog(QDialog):
         root.setSpacing(16)
         header = QVBoxLayout()
         header.setSpacing(4)
-        header.addWidget(label("Export video", "title"))
+        self.heading = label("Export video", "title")
+        header.addWidget(self.heading)
         header.addWidget(label("Trim pauses, level audio, and save your edit.", "muted"))
         root.addLayout(header)
 
         columns = QHBoxLayout()
         columns.setSpacing(16)
         root.addLayout(columns, 1)
-        left = QVBoxLayout()
+        self.settings_scroll = QScrollArea()
+        self.settings_scroll.setObjectName("exportSettings")
+        self.settings_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.settings_scroll.setWidgetResizable(True)
+        self.settings_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.settings_scroll.setMinimumHeight(320)
+        self.settings_content = QWidget()
+        left = QVBoxLayout(self.settings_content)
+        left.setContentsMargins(0, 0, 0, 0)
         left.setSpacing(12)
-        columns.addLayout(left, 1)
+        self.settings_scroll.setWidget(self.settings_content)
+        columns.addWidget(self.settings_scroll, 1)
         audio, audio_layout = card()
         self.add_heading(audio_layout, "Audio cleanup", "wave")
         self.silence = self.add_switch(audio_layout, "Remove silence", "Shorten pauses while protecting speech.",
@@ -403,22 +419,65 @@ class ExportDialog(QDialog):
         form.setColumnStretch(1, 1)
         output_layout.addLayout(form)
 
-        self.quality = self.combo(self.quality_names, ("copy", "lossless", "film", "compact"), self.quality_tips, "Quality")
-        quality = max(0, min(3, self.prefs.value("quality", 2, type=int)))
-        self.quality.setCurrentIndex(2 if quality == 0 and self.silence.isChecked() else quality)
+        self.kind = self.combo(
+            ("Video", "Audio only · M4A"), ("film", "wave"),
+            ("Export the edited video and its linked audio.", "Export AAC audio only, with the same edits and audio cleanup."),
+            "Export type",
+        )
+        self.kind.setCurrentIndex(int(self.prefs.value("audio_only", False, type=bool)))
+        self.kind.currentIndexChanged.connect(self.kind_changed)
+        self.add_field(form, 0, "Export", self.kind)
+        self.quality = self.combo(
+            self.quality_names, ("copy", "lossless", "film", "compact", "compact"),
+            self.quality_tips, "Quality",
+        )
+        quality = max(0, min(self.HEVC, self.prefs.value("quality", 2, type=int)))
+        self.quality.setCurrentIndex(2 if quality == 0 and self.silence.isChecked() and not self.audio_only() else quality)
         self.quality.currentIndexChanged.connect(self.quality_changed)
-        self.add_field(form, 0, "Quality", self.quality)
+        self.quality_label = self.add_field(form, 1, "Quality", self.quality)
         self.quality_hint = label("", "hint")
         self.quality_hint.setWordWrap(True)
-        form.addWidget(self.quality_hint, 1, 1)
+        form.addWidget(self.quality_hint, 2, 1)
+        self.compression = QWidget()
+        controls = QVBoxLayout(self.compression)
+        controls.setContentsMargins(0, 2, 0, 2)
+        controls.setSpacing(4)
+        value_row = QHBoxLayout()
+        value_row.addWidget(label("Compression quality", "strong"))
+        value_row.addStretch()
+        self.compression_value = label("", "hint")
+        value_row.addWidget(self.compression_value)
+        self.compression_reset = button("Reset", lambda: self.compression_slider.setValue(self.RECOMMENDED))
+        self.compression_reset.setMinimumHeight(24)
+        self.compression_reset.setToolTip("Restore the recommended quality of 24.")
+        value_row.addWidget(self.compression_reset)
+        controls.addLayout(value_row)
+        self.compression_slider = QSlider(Qt.Orientation.Horizontal)
+        self.compression_slider.setAccessibleName("HEVC quality")
+        self.compression_slider.setRange(18, 32)
+        self.compression_slider.setInvertedAppearance(True)
+        self.compression_slider.setInvertedControls(True)
+        self.compression_slider.setValue(self.prefs.value("compression_quality", self.RECOMMENDED, type=int))
+        self.compression_slider.setToolTip(
+            "Lower values keep more detail. Start at 24, then preview a sample. "
+            "The value controls CRF on CPU or CQ on NVIDIA."
+        )
+        self.compression_slider.valueChanged.connect(self.update_options)
+        controls.addWidget(self.compression_slider)
+        directions = QHBoxLayout()
+        directions.addWidget(label("Smaller file", "hint"))
+        directions.addStretch()
+        directions.addWidget(label("More detail", "hint"))
+        controls.addLayout(directions)
+        form.addWidget(self.compression, 3, 1)
         self.dest = self.combo(("Video folder", "Choose folder…", "Ask each time"),
                                ("film", "folder", "ask"), self.destination_tips, "Save to")
         self.dest.setCurrentIndex(self.destination)
         self.dest.activated.connect(self.choose_destination)
-        self.add_field(form, 2, "Save to", self.dest)
+        self.add_field(form, 4, "Save to", self.dest)
         self.destination_hint = label("", "hint")
         self.destination_hint.setWordWrap(True)
-        form.addWidget(self.destination_hint, 3, 1)
+        form.addWidget(self.destination_hint, 5, 1)
 
         name_field = QWidget()
         name_row = QHBoxLayout(name_field)
@@ -432,7 +491,7 @@ class ExportDialog(QDialog):
         self.suffix = label(".mp4", "suffix")
         self.suffix.setFixedHeight(34)
         name_row.addWidget(self.suffix)
-        self.add_field(form, 4, "File name", name_field, self.name)
+        self.add_field(form, 6, "File name", name_field, self.name)
         left.addWidget(output)
         left.addStretch()
 
@@ -529,6 +588,7 @@ class ExportDialog(QDialog):
         title.setBuddy(buddy or widget)
         layout.addWidget(title, row, 0)
         layout.addWidget(widget, row, 1)
+        return title
 
     def slider(self, layout, row, text, low, high, default, scale, unit):
         title, display = label(text, "hint"), label("", "hint")
@@ -561,9 +621,18 @@ class ExportDialog(QDialog):
         layout.addLayout(row)
         return value
 
+    def audio_only(self):
+        return self.kind.currentIndex() == 1
+
+    def sample_preview(self):
+        return self.audio_only() or self.quality.currentIndex() == self.HEVC
+
+    def kind_changed(self, _kind):
+        self.silence_changed(self.silence.isChecked())
+
     def quality_changed(self, quality):
         self.quality_note = ""
-        if quality == 0 and self.silence.isChecked():
+        if quality == 0 and self.silence.isChecked() and not self.audio_only():
             with QSignalBlocker(self.silence):
                 self.silence.setChecked(False)
             self.quality_note = "Remove silence was turned off."
@@ -571,7 +640,7 @@ class ExportDialog(QDialog):
 
     def silence_changed(self, enabled):
         self.quality_note = ""
-        if enabled and self.quality.currentIndex() == 0:
+        if enabled and self.quality.currentIndex() == 0 and not self.audio_only():
             with QSignalBlocker(self.quality):
                 self.quality.setCurrentIndex(2)
             self.quality_note = "Switched to High quality for accurate silence cuts."
@@ -581,33 +650,58 @@ class ExportDialog(QDialog):
         silence = self.silence.isChecked()
         preset = self.preset.checkedId()
         quality = self.quality.currentIndex()
-        was_custom = not self.custom.isHidden()
-        custom = silence and preset == 3
+        audio = self.audio_only()
+        was_visible = tuple(not control.isHidden() for control in (self.custom, self.quality, self.compression))
+        custom, compress = silence and preset == 3, not audio and quality == self.HEVC
         self.preset_box.setVisible(silence)
         self.custom.setVisible(custom)
-        if emit and self.isVisible() and custom != was_custom:
+        self.quality_label.setVisible(not audio)
+        self.quality.setVisible(not audio)
+        self.compression.setVisible(compress)
+        if emit and self.isVisible() and was_visible != (custom, not audio, compress):
             QTimer.singleShot(0, self.fit_height)
-        hint = self.quality_hints[quality]
-        if quality == 0 and self.level.isChecked():
+        value = self.compression_slider.value()
+        self.compression_value.setText(f"{value} · Recommended" if value == self.RECOMMENDED else str(value))
+        self.compression_reset.setEnabled(value != self.RECOMMENDED)
+        hint = "AAC at 192 kb/s per track. Keeps your edits and audio cleanup." if audio else self.quality_hints[quality]
+        if not audio and quality == 0 and self.level.isChecked():
             hint += " Even audio re-encodes audio."
         if self.quality_note:
             hint = f"{hint} {self.quality_note}"
         self.quality_hint.setText(hint)
         self.quality.setToolTip(self.quality_tips[quality])
+        title = "Export audio" if audio else "Export video"
+        self.heading.setText(title)
+        self.save.setText(title)
+        sample = self.sample_preview()
+        self.preview_button.setText("Preview sample" if sample else "Preview")
+        self.preview_button.setToolTip(
+            "Encode and play the first eight seconds at these settings." if sample
+            else "Play the edit with the selected silence and audio settings before exporting."
+        )
         extension = self.extension()
         self.suffix.setText("." + extension)
         self.format.setText(extension.upper())
         for key, value in (("silence", silence), ("preset", preset), ("quality", quality),
-                           ("level", self.level.isChecked())):
+                           ("level", self.level.isChecked()), ("audio_only", audio),
+                           ("compression_quality", value)):
             self.prefs.setValue(key, value)
         if emit:
             self.changed.emit()
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        QTimer.singleShot(0, self.fit_height)
+
     def fit_height(self):
         self.layout().activate()
-        self.resize(self.width(), self.minimumSizeHint().height())
+        chrome = self.height() - self.settings_scroll.viewport().height()
+        desired = chrome + self.settings_content.sizeHint().height()
+        self.resize(self.width(), min(desired, self.screen().availableGeometry().height() - 52))
 
     def extension(self):
+        if self.audio_only():
+            return "m4a"
         return "mp4" if self.quality.currentIndex() >= 2 else "mkv"
 
     def options(self):
@@ -617,7 +711,8 @@ class ExportDialog(QDialog):
         else:
             values = ((-55, .8, .18), (-50, .5, .14), (-50, .3, .12))[preset]
         return dict(threshold=values[0], min_silence=values[1], padding=values[2],
-                    quality=self.quality.currentIndex(), level=self.level.isChecked(),
+                    quality=self.quality.currentIndex(), compression_quality=self.compression_slider.value(),
+                    level=self.level.isChecked(),
                     dark=self.editor.dark, gpu=True, adaptive=preset != 3)
 
     def choose_destination(self, destination, prompt=True):
@@ -638,6 +733,6 @@ class ExportDialog(QDialog):
 
     def set_busy(self, busy):
         for control in (self.silence, self.preset_box, self.custom, self.level, self.name,
-                        self.save, self.preview_button, self.quality, self.dest):
+                        self.save, self.preview_button, self.kind, self.quality, self.compression, self.dest):
             control.setEnabled(not busy)
         self.cancel.setVisible(busy)
